@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>klavye.d — on parmak</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1f2023;
+    --bg2: #27292d;
+    --bg3: #303237;
+    --sub: #5c6068;
+    --sub2: #3b3e44;
+    --text: #d6d4cb;
+    --main: #e2b714;
+    --ok: #a6d189;
+    --err: #e05561;
+    --err-bg: rgba(224, 85, 97, .22);
+    --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+    --font-size: clamp(22px, 3.2vw, 34px);
+    --line-h: 1.65;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    display: flex;
+    justify-content: center;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app {
+    width: 100%;
+    max-width: 1060px;
+    padding: 28px 16px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    min-height: 100%;
+  }
+
+  /* ---------- Üst bar ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .logo { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -.5px; user-select: none; }
+  .logo span { color: var(--main); }
+  .logo small { display: block; font-size: 11px; font-weight: 400; color: var(--sub); letter-spacing: 1px; margin-top: -2px; }
+
+  .settings {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    background: var(--bg2);
+    border-radius: 10px;
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  .group { display: flex; align-items: center; gap: 2px; }
+  .group + .group { border-left: 2px solid var(--bg); padding-left: 12px; }
+  .settings button {
+    font: inherit;
+    background: none;
+    border: 0;
+    color: var(--sub);
+    padding: 5px 7px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: color .15s, background .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .settings button:hover { color: var(--text); }
+  .settings button.active { color: var(--main); }
+  .settings button svg { width: 16px; height: 16px; }
+
+  /* ---------- İstatistikler ---------- */
+  .stats {
+    display: flex;
+    gap: 34px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    min-height: 64px;
+    user-select: none;
+  }
+  .stat .label { font-size: 13px; color: var(--sub); }
+  .stat .value { font-size: 40px; line-height: 1.05; color: var(--main); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .stat.small .value { font-size: 28px; color: var(--text); }
+  .stat .unit { font-size: 14px; color: var(--sub); margin-left: 2px; }
+  .stat.clickable { cursor: pointer; }
+  .stat.clickable:hover .label { color: var(--text); }
+  #comboVal { display: inline-block; transition: color .2s; }
+  #comboVal.bump { animation: bump .18s ease-out; }
+  @keyframes bump { 0% { transform: scale(1.18); } 100% { transform: scale(1); } }
+  #comboVal.hot { color: var(--main); }
+  #comboVal.broken { color: var(--err); }
+
+  /* ---------- Metin ---------- */
+  .level-info { font-size: 13px; color: var(--sub); margin-bottom: -10px; min-height: 18px; word-spacing: 2px; }
+  .level-info b { color: var(--text); font-weight: 500; }
+
+  .text-box {
+    position: relative;
+    font-size: var(--font-size);
+    line-height: var(--line-h);
+    height: calc(var(--font-size) * var(--line-h) * 3);
+    overflow: hidden;
+    user-select: none;
+    cursor: default;
+  }
+  .words { position: relative; display: flex; flex-wrap: wrap; align-content: flex-start; }
+  .word { display: flex; height: calc(var(--font-size) * var(--line-h)); }
+  .letter { color: var(--sub); position: relative; transition: color .06s; }
+  .letter.space { width: .62em; }
+  .letter.correct { color: var(--ok); }
+  .letter.incorrect { color: var(--err); }
+  .letter.incorrect:not(.space)::after {
+    content: ""; position: absolute; left: 8%; right: 8%; bottom: 14%;
+    height: 2px; background: var(--err); border-radius: 2px; opacity: .7;
+  }
+  .letter.space.incorrect { background: var(--err-bg); border-radius: 4px; }
+
+  .caret {
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px;
+    height: calc(var(--font-size) * 1.15);
+    background: var(--main);
+    border-radius: 2px;
+    transition: transform .08s ease-out, background .15s;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .caret.no-anim { transition: none; }
+  .caret.blink { animation: blink 1s step-end infinite; }
+  .caret.error { background: var(--err); }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .text-box.blurred .words { filter: blur(5px); opacity: .5; }
+  .text-box.blurred .caret { opacity: 0; }
+  .focus-msg {
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center;
+    font-size: 16px; color: var(--text); z-index: 3; cursor: pointer;
+  }
+  .text-box.blurred .focus-msg { display: flex; }
+
+  .hint { text-align: center; font-size: 12px; color: var(--sub); user-select: none; }
+  kbd {
+    font-family: var(--mono); font-size: 11px;
+    background: var(--bg3); color: var(--text);
+    padding: 1px 6px; border-radius: 4px;
+  }
+
+  /* ---------- Görsel klavye ---------- */
+  .kb-wrap { margin-top: 18px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .kb-wrap.hidden { display: none; }
+  .finger { font-size: 13px; color: var(--sub); min-height: 18px; user-select: none; }
+  .finger b { color: var(--main); font-weight: 500; }
+  .keyboard {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    user-select: none;
+  }
+  .kb-row { display: flex; gap: 5px; }
+  .key {
+    flex: 1 1 0;
+    min-width: 0;
+    height: clamp(26px, 5vw, 42px);
+    background: var(--bg2);
+    border-radius: 6px;
+    color: var(--sub);
+    font-size: clamp(10px, 1.7vw, 15px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: background .12s, color .12s, box-shadow .12s;
+  }
+  .key .sh { position: absolute; top: 2px; left: 5px; font-size: .68em; opacity: .7; }
+  .key.mod { font-size: clamp(8px, 1.2vw, 11px); color: var(--sub2); background: #232528; }
+  .key.ghost { visibility: hidden; }
+  .key.bump::after {
+    content: ""; position: absolute; bottom: 5px; width: 26%; height: 2px;
+    border-radius: 2px; background: var(--sub);
+  }
+  .key.press-ok { background: #3c4a35; color: var(--ok); }
+  .key.press-err { background: #5a2a30; color: var(--err); }
+  .key.target { background: var(--main); color: var(--bg); box-shadow: 0 0 0 2px rgba(226, 183, 20, .25), 0 0 18px rgba(226, 183, 20, .25); }
+  .key.target.bump::after { background: var(--bg); }
+  .key.target-shift { background: var(--bg3); color: var(--main); box-shadow: inset 0 0 0 2px var(--main); }
+
+  @media (max-width: 640px) {
+    .stats { gap: 20px; }
+    .stat .value { font-size: 30px; }
+    .stat.small .value { font-size: 22px; }
+    .group + .group { border-left: 0; padding-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">klavye<span>.</span>d<small>on parmak antrenmanı</small></div>
+    <div class="settings" id="settings">
+      <div class="group" data-setting="layout">
+        <button data-value="q">türkçe q</button>
+        <button data-value="f">türkçe f</button>
+      </div>
+      <div class="group" data-setting="level">
+        <button data-value="1" title="Orta satır">sv 1</button>
+        <button data-value="2" title="Orta + üst satır">sv 2</button>
+        <button data-value="3" title="Tüm harfler">sv 3</button>
+        <button data-value="4" title="Tüm harfler + rakam + noktalama">sv 4</button>
+      </div>
+      <div class="group" data-setting="metric">
+        <button data-value="wpm" title="Dakikada kelime (5 vuruş = 1 kelime)">wpm</button>
+        <button data-value="dks" title="Dakikada karakter (vuruş)">dks</button>
+      </div>
+      <div class="group">
+        <button id="soundBtn" title="Sesi aç / kapat"></button>
+        <button id="kbBtn" title="Klavye rehberini aç / kapat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 15.5h6"/></svg>
+          klavye
+        </button>
+        <button id="restartBtn" title="Yeniden başlat (Esc / Tab)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat clickable" id="speedStat" title="Tıkla: WPM / DKS">
+      <div class="label" id="speedLabel">wpm</div>
+      <div class="value" id="speedVal">–</div>
+    </div>
+    <div class="stat small">
+      <div class="label">doğruluk</div>
+      <div class="value"><span id="accVal">–</span><span class="unit">%</span></div>
+    </div>
+    <div class="stat small">
+      <div class="label">seri</div>
+      <div class="value"><span id="comboVal">0</span></div>
+    </div>
+    <div class="stat small">
+      <div class="label">en iyi seri</div>
+      <div class="value" id="maxComboVal">0</div>
+    </div>
+    <div class="stat small">
+      <div class="label">süre</div>
+      <div class="value" id="timeVal">0:00</div>
+    </div>
+  </div>
+
+  <div class="level-info" id="levelInfo"></div>
+
+  <div class="text-box" id="textBox">
+    <div class="words" id="words"></div>
+    <div class="caret blink" id="caret"></div>
+    <div class="focus-msg" id="focusMsg">yazmaya devam etmek için tıkla</div>
+  </div>
+
+  <div class="hint">
+    <kbd>esc</kbd> / <kbd>tab</kbd> yeniden başlat &nbsp;·&nbsp; <kbd>ctrl</kbd>+<kbd>⌫</kbd> kelimeyi sil &nbsp;·&nbsp; işletim sistemindeki klavye düzenin seçtiğin düzenle aynı olmalı
+  </div>
+
+  <div class="kb-wrap" id="kbWrap">
+    <div class="finger" id="fingerHint"></div>
+    <div class="keyboard" id="keyboard"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* =====================================================================
+   *  Klavye düzenleri
+   *  Her satır: fiziksel sırada tuşlar + shift ile çıkan karakterler.
+   *  Harf tuşlarının shift karşılığı Türkçe büyük harf kuralıyla hesaplanır.
+   * ===================================================================== */
+  const LAYOUTS = {
+    q: {
+      name: 'Türkçe Q',
+      bumps: ['f', 'j'],
+      rows: [
+        { keys: ['"', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '*', '-'],
+          shift: ['é', '!', "'", '^', '+', '%', '&', '/', '(', ')', '=', '?', '_'] },
+        { keys: [...'qwertyuıopğü'] },
+        { keys: [...'asdfghjklşi', ','], shift: { ',': ';' } },
+        { keys: ['<', ...'zxcvbnmöç', '.'], shift: { '<': '>', '.': ':' } },
+      ],
+    },
+    f: {
+      name: 'Türkçe F',
+      bumps: ['a', 'k'],
+      rows: [
+        { keys: ['+', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '/', '-'],
+          shift: ['*', '!', '"', '^', '$', '%', '&', "'", '(', ')', '=', '?', '_'] },
+        { keys: [...'fgğıodrnhpqw'] },
+        { keys: [...'uieaütkmlyşx'] },
+        { keys: ['<', ...'jövcçzsb', '.', ','], shift: { '<': '>', '.': ':', ',': ';' } },
+      ],
+    },
+  };
+
+  // Fiziksel konuma göre parmak ataması (iki düzen için de aynı).
+  // 0 sol serçe, 1 sol yüzük, 2 sol orta, 3 sol işaret, 4 sağ işaret, 5 sağ orta, 6 sağ yüzük, 7 sağ serçe, 8 başparmak
+  const FINGER_MAP = [
+    [0, 0, 1, 2, 3, 3, 4, 4, 5, 6, 7, 7, 7],
+    [0, 1, 2, 3, 3, 4, 4, 5, 6, 7, 7, 7],
+    [0, 1, 2, 3, 3, 4, 4, 5, 6, 7, 7, 7],
+    [0, 0, 1, 2, 3, 3, 4, 4, 5, 6, 7],
+  ];
+  const FINGER_NAMES = ['sol serçe', 'sol yüzük', 'sol orta', 'sol işaret', 'sağ işaret', 'sağ orta', 'sağ yüzük', 'sağ serçe', 'başparmak'];
+
+  const DIGITS = [...'0123456789'];
+  const PUNCT_END = ['.', ',', '?', '!', ':', ';'];
+  const PUNCT_MID = ['-', "'"];
+
+  const isLetter = (ch) => /\p{L}/u.test(ch);
+  const upperTR = (ch) => ch.toLocaleUpperCase('tr-TR');
+  const shiftOf = (row, i) => {
+    const k = row.keys[i];
+    if (Array.isArray(row.shift)) return row.shift[i];
+    if (row.shift && row.shift[k]) return row.shift[k];
+    return isLetter(k) ? upperTR(k) : null;
+  };
+
+  function levelLetters(layoutKey, level) {
+    const rows = LAYOUTS[layoutKey].rows;
+    const home = rows[2].keys.filter(isLetter);
+    const top = rows[1].keys.filter(isLetter);
+    const bottom = rows[3].keys.filter(isLetter);
+    if (level === 1) return { letters: home, newOnes: home };
+    if (level === 2) return { letters: [...home, ...top], newOnes: top };
+    return { letters: [...home, ...top, ...bottom], newOnes: level === 3 ? bottom : [...DIGITS, ...PUNCT_END, ...PUNCT_MID] };
+  }
+
+  /* =====================================================================
+   *  Ayarlar (localStorage erişilemezse varsayılanlarla çalışır)
+   * ===================================================================== */
+  const DEFAULTS = { layout: 'q', level: 1, metric: 'wpm', sound: true, keyboard: true };
+  const settings = { ...DEFAULTS };
+  try {
+    const saved = JSON.parse(localStorage.getItem('klavyed-settings') || '{}');
+    Object.assign(settings, saved);
+  } catch (_) { /* yoksay */ }
+  if (!LAYOUTS[settings.layout]) settings.layout = 'q';
+  settings.level = [1, 2, 3, 4].includes(+settings.level) ? +settings.level : 1;
+  const saveSettings = () => {
+    try { localStorage.setItem('klavyed-settings', JSON.stringify(settings)); } catch (_) { /* yoksay */ }
+  };
+
+  /* =====================================================================
+   *  Rastgele dizi üretici
+   * ===================================================================== */
+  const rnd = (n) => Math.floor(Math.random() * n);
+  const pick = (arr) => arr[rnd(arr.length)];
+  const randInt = (a, b) => a + rnd(b - a + 1);
+
+  function randomSeq(pool, len) {
+    let s = '';
+    while (s.length < len) {
+      const c = pick(pool);
+      // Aynı harfin üç kez art arda gelmesini engelle
+      if (s.length >= 2 && s[s.length - 1] === c && s[s.length - 2] === c) continue;
+      s += c;
+    }
+    return s;
+  }
+
+  function generateWord() {
+    const { letters } = levelLetters(settings.layout, settings.level);
+    if (settings.level < 4) return randomSeq(letters, randInt(3, 6));
+
+    const r = Math.random();
+    if (r < 0.15) return randomSeq(DIGITS, randInt(2, 4));
+    let w = randomSeq(letters, randInt(3, 5));
+    if (r < 0.42) {
+      w += pick(PUNCT_END);
+    } else if (r < 0.54) {
+      const k = randInt(1, w.length - 1);
+      w = w.slice(0, k) + pick(PUNCT_MID) + w.slice(k);
+    } else if (r < 0.62) {
+      w += pick(DIGITS);
+    }
+    return w;
+  }
+
+  /* =====================================================================
+   *  Ses (Web Audio API — dosya yok, her şey sentezleniyor)
+   * ===================================================================== */
+  let actx = null, master = null;
+  function ensureAudio() {
+    if (!actx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      actx = new AC();
+      master = actx.createGain();
+      master.gain.value = 0.32;
+      const comp = actx.createDynamicsCompressor();
+      master.connect(comp).connect(actx.destination);
+    }
+    if (actx.state === 'suspended') actx.resume();
+    return true;
+  }
+
+  const BASE_FREQ = 261.63;   // Do (C4)
+  const STEPS_PER_OCTAVE = 24; // her doğru vuruş = yarım yarım ses (çeyrek ton) yükselme
+  const MAX_STEP = 48;         // en fazla iki oktav yukarı çıkar
+
+  function blip(freq, { type = 'triangle', dur = 0.11, vol = 0.5, when = 0 } = {}) {
+    const t = actx.currentTime + when;
+    const osc = actx.createOscillator();
+    const g = actx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g).connect(master);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
+  }
+
+  function playHit(combo) {
+    if (!settings.sound || !ensureAudio()) return;
+    const step = Math.min(combo - 1, MAX_STEP);
+    const f = BASE_FREQ * Math.pow(2, step / STEPS_PER_OCTAVE);
+    blip(f, { type: 'triangle', dur: 0.1, vol: 0.45 });
+    blip(f * 2, { type: 'sine', dur: 0.06, vol: 0.08 }); // hafif parlaklık
+    // Her 50'lik seride küçük bir ödül akoru
+    if (combo > 0 && combo % 50 === 0) {
+      [1, 1.25, 1.5, 2].forEach((m, i) => blip(BASE_FREQ * 2 * m, { type: 'sine', dur: 0.22, vol: 0.18, when: 0.05 + i * 0.06 }));
+    }
+  }
+
+  function playError() {
+    if (!settings.sound || !ensureAudio()) return;
+    const t = actx.currentTime;
+    const osc = actx.createOscillator();
+    const filt = actx.createBiquadFilter();
+    const g = actx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(85, t + 0.14);
+    filt.type = 'lowpass';
+    filt.frequency.value = 700;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.35, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    osc.connect(filt).connect(g).connect(master);
+    osc.start(t);
+    osc.stop(t + 0.18);
+  }
+
+  /* =====================================================================
+   *  DOM
+   * ===================================================================== */
+  const $ = (id) => document.getElementById(id);
+  const textBox = $('textBox'), wordsEl = $('words'), caret = $('caret');
+  const speedVal = $('speedVal'), speedLabel = $('speedLabel'), accVal = $('accVal');
+  const comboVal = $('comboVal'), maxComboVal = $('maxComboVal'), timeVal = $('timeVal');
+  const kbWrap = $('kbWrap'), keyboardEl = $('keyboard'), fingerHint = $('fingerHint');
+  const levelInfo = $('levelInfo');
+
+  /* =====================================================================
+   *  Durum
+   * ===================================================================== */
+  const IDLE_CAP_MS = 2000; // iki vuruş arası 2 sn'den uzunsa fazlası sayılmaz (mola)
+  const LOOKAHEAD = 160;     // imlecin önünde en az bu kadar karakter hazır tutulur
+
+  let chars = [];   // { ch, el, state: null | 'correct' | 'incorrect' }
+  let words = [];   // { el, len }
+  let pos = 0;
+  let stats;
+
+  function resetStats() {
+    stats = {
+      started: false,
+      activeMs: 0,
+      lastAt: 0,
+      keystrokes: 0,   // toplam vuruş (doğruluk için)
+      hits: 0,         // doğru vuruş (doğruluk için)
+      netCorrect: 0,   // şu an doğru duran karakter sayısı (hız için)
+      combo: 0,
+      maxCombo: 0,
+    };
+  }
+
+  /* ---------- Metin ---------- */
+  function appendWord(text) {
+    const wEl = document.createElement('div');
+    wEl.className = 'word';
+    const seq = [...text, ' '];
+    for (const ch of seq) {
+      const s = document.createElement('span');
+      s.className = ch === ' ' ? 'letter space' : 'letter';
+      s.textContent = ch === ' ' ? ' ' : ch;
+      wEl.appendChild(s);
+      chars.push({ ch, el: s, state: null });
+    }
+    wordsEl.appendChild(wEl);
+    words.push({ el: wEl, len: seq.length });
+  }
+
+  function refill() {
+    while (chars.length - pos < LOOKAHEAD) appendWord(generateWord());
+  }
+
+  // İmleç 3. satıra indiyse en üstteki satırı kaldır → metin sonsuz akar
+  function maybeScroll() {
+    if (!words.length || pos >= chars.length) return false;
+    const curWord = chars[pos].el.parentElement;
+    const firstTop = words[0].el.offsetTop;
+    const lineH = words[0].el.offsetHeight;
+    if (curWord.offsetTop - firstTop < lineH * 1.5) return false;
+
+    let removeChars = 0, removeWords = 0;
+    for (const w of words) {
+      if (w.el.offsetTop - firstTop > lineH / 2) break;
+      removeChars += w.len;
+      removeWords++;
+    }
+    if (!removeWords || removeChars > pos) return false;
+    for (let i = 0; i < removeWords; i++) words[i].el.remove();
+    words.splice(0, removeWords);
+    chars.splice(0, removeChars);
+    pos -= removeChars;
+    return true;
+  }
+
+  function updateCaret(instant) {
+    if (pos >= chars.length) return;
+    const el = chars[pos].el;
+    const r = el.getBoundingClientRect();
+    const b = textBox.getBoundingClientRect();
+    const h = caret.offsetHeight;
+    const x = r.left - b.left - 1;
+    const y = r.top - b.top + (r.height - h) / 2;
+    if (instant) caret.classList.add('no-anim');
+    caret.style.transform = `translate(${x}px, ${y}px)`;
+    if (instant) {
+      void caret.offsetWidth;
+      caret.classList.remove('no-anim');
+    }
+  }
+
+  /* ---------- Görsel klavye ---------- */
+  let keyIndex = new Map(); // karakter → { el, shift, finger }
+  let shiftEls = {};
+
+  function makeKey(label, opts = {}) {
+    const k = document.createElement('div');
+    k.className = 'key' + (opts.cls ? ' ' + opts.cls : '');
+    if (opts.u) k.style.flexGrow = opts.u;
+    if (opts.sh) {
+      const s = document.createElement('span');
+      s.className = 'sh';
+      s.textContent = opts.sh;
+      k.appendChild(s);
+    }
+    k.appendChild(document.createTextNode(label));
+    return k;
+  }
+
+  function buildKeyboard() {
+    const L = LAYOUTS[settings.layout];
+    keyboardEl.innerHTML = '';
+    keyIndex = new Map();
+    const edges = [
+      [null, { label: '⌫', u: 2 }],
+      [{ label: 'tab', u: 1.5 }, { label: '', u: 1.5 }],
+      [{ label: 'caps', u: 1.75 }, { label: 'enter', u: 1.25 }],
+      [{ label: 'shift', u: 1.25, id: 'left' }, { label: 'shift', u: 2.75, id: 'right' }],
+    ];
+    L.rows.forEach((row, ri) => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'kb-row';
+      const [pre, post] = edges[ri];
+      if (pre) {
+        const e = makeKey(pre.label, { u: pre.u, cls: 'mod' });
+        if (pre.id) shiftEls[pre.id] = e;
+        rowEl.appendChild(e);
+      }
+      row.keys.forEach((k, ki) => {
+        const sh = shiftOf(row, ki);
+        const showSh = sh && !isLetter(k) ? sh : null;
+        const finger = FINGER_MAP[ri][ki];
+        const el = makeKey(k, { sh: showSh, cls: L.bumps.includes(k) ? 'bump' : '' });
+        rowEl.appendChild(el);
+        if (!keyIndex.has(k)) keyIndex.set(k, { el, shift: false, finger });
+        if (sh && !keyIndex.has(sh)) keyIndex.set(sh, { el, shift: true, finger });
+      });
+      if (post) {
+        const e = makeKey(post.label, { u: post.u, cls: 'mod' });
+        if (post.id) shiftEls[post.id] = e;
+        rowEl.appendChild(e);
+      }
+      keyboardEl.appendChild(rowEl);
+    });
+    const spaceRow = document.createElement('div');
+    spaceRow.className = 'kb-row';
+    spaceRow.appendChild(makeKey('', { u: 3.75, cls: 'ghost' }));
+    const space = makeKey('boşluk', { u: 6.25 });
+    spaceRow.appendChild(space);
+    spaceRow.appendChild(makeKey('', { u: 5, cls: 'ghost' }));
+    keyboardEl.appendChild(spaceRow);
+    keyIndex.set(' ', { el: space, shift: false, finger: 8 });
+  }
+
+  let targetEls = [];
+  function highlightNext() {
+    targetEls.forEach((e) => e.classList.remove('target', 'target-shift'));
+    targetEls = [];
+    if (!settings.keyboard || pos >= chars.length) return;
+    const info = keyIndex.get(chars[pos].ch);
+    if (!info) { fingerHint.textContent = ''; return; }
+    info.el.classList.add('target');
+    targetEls.push(info.el);
+    let txt = `<b>${FINGER_NAMES[info.finger]}</b> parmak`;
+    if (info.shift) {
+      // Shift'e karşı elin serçe parmağıyla basılır
+      const sEl = info.finger <= 3 ? shiftEls.right : shiftEls.left;
+      sEl.classList.add('target-shift');
+      targetEls.push(sEl);
+      txt += ` + <b>${info.finger <= 3 ? 'sağ' : 'sol'} shift</b>`;
+    }
+    fingerHint.innerHTML = txt;
+  }
+
+  function flashKey(ch, ok) {
+    if (!settings.keyboard) return;
+    const info = keyIndex.get(ch);
+    if (!info) return;
+    const cls = ok ? 'press-ok' : 'press-err';
+    info.el.classList.remove('press-ok', 'press-err');
+    void info.el.offsetWidth;
+    info.el.classList.add(cls);
+    clearTimeout(info.el._t);
+    info.el._t = setTimeout(() => info.el.classList.remove(cls), 140);
+  }
+
+  /* ---------- İstatistik ekranı ---------- */
+  function elapsedMs() {
+    if (!stats.started) return 0;
+    return stats.activeMs + Math.min(performance.now() - stats.lastAt, IDLE_CAP_MS);
+  }
+
+  function renderStats() {
+    const ms = elapsedMs();
+    const min = ms / 60000;
+    speedLabel.textContent = settings.metric;
+    if (stats.keystrokes < 2 || ms < 1000) {
+      speedVal.textContent = '–';
+    } else {
+      const cpm = stats.netCorrect / min;
+      speedVal.textContent = Math.round(settings.metric === 'wpm' ? cpm / 5 : cpm);
+    }
+    accVal.textContent = stats.keystrokes ? Math.floor((stats.hits / stats.keystrokes) * 1000) / 10 : '–';
+    comboVal.textContent = stats.combo;
+    comboVal.classList.toggle('hot', stats.combo >= 25);
+    maxComboVal.textContent = stats.maxCombo;
+    const s = Math.floor(ms / 1000);
+    timeVal.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  function bumpCombo(broken) {
+    comboVal.classList.remove('bump', 'broken');
+    void comboVal.offsetWidth;
+    comboVal.classList.add(broken ? 'broken' : 'bump');
+    if (broken) {
+      clearTimeout(comboVal._t);
+      comboVal._t = setTimeout(() => comboVal.classList.remove('broken'), 350);
+    }
+  }
+
+  /* ---------- Yazma ---------- */
+  let idleTimer = null;
+  function markActive() {
+    caret.classList.remove('blink');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => caret.classList.add('blink'), 1000);
+  }
+
+  function typeChar(ch) {
+    const now = performance.now();
+    if (!stats.started) {
+      stats.started = true;
+    } else {
+      stats.activeMs += Math.min(now - stats.lastAt, IDLE_CAP_MS);
+    }
+    stats.lastAt = now;
+
+    const c = chars[pos];
+    const ok = ch === c.ch;
+    stats.keystrokes++;
+    if (ok) {
+      stats.hits++;
+      stats.netCorrect++;
+      stats.combo++;
+      if (stats.combo > stats.maxCombo) stats.maxCombo = stats.combo;
+      playHit(stats.combo);
+      bumpCombo(false);
+    } else {
+      if (stats.combo > 0) bumpCombo(true);
+      stats.combo = 0;
+      playError();
+      caret.classList.add('error');
+      clearTimeout(caret._t);
+      caret._t = setTimeout(() => caret.classList.remove('error'), 180);
+    }
+    c.state = ok ? 'correct' : 'incorrect';
+    c.el.classList.add(c.state);
+    flashKey(c.ch, ok);
+    pos++;
+    afterMove();
+  }
+
+  // Geri silme: kelimenin içinde serbest; doğru yazılmış bir boşluğun gerisine geçilmez.
+  function backspace(wholeWord) {
+    const canStepBack = () => pos > 0 && !(chars[pos - 1].ch === ' ' && chars[pos - 1].state === 'correct');
+    if (!canStepBack()) return;
+    do {
+      pos--;
+      const c = chars[pos];
+      if (c.state === 'correct') stats.netCorrect--;
+      c.state = null;
+      c.el.classList.remove('correct', 'incorrect');
+    } while (wholeWord && canStepBack() && chars[pos - 1].ch !== ' ');
+    afterMove();
+  }
+
+  function afterMove() {
+    refill();
+    const scrolled = maybeScroll();
+    updateCaret(scrolled);
+    highlightNext();
+    renderStats();
+    markActive();
+  }
+
+  function restart() {
+    resetStats();
+    chars = [];
+    words = [];
+    pos = 0;
+    wordsEl.innerHTML = '';
+    refill();
+    updateCaret(true);
+    highlightNext();
+    renderStats();
+    caret.classList.add('blink');
+    renderLevelInfo();
+  }
+
+  function renderLevelInfo() {
+    const { newOnes } = levelLetters(settings.layout, settings.level);
+    const names = { 1: 'orta satır', 2: 'orta + üst satır', 3: 'tüm harfler', 4: 'harfler + rakam + noktalama' };
+    const shown = newOnes.map((c) => (c === ' ' ? '␣' : c)).join(' ');
+    levelInfo.innerHTML = `${LAYOUTS[settings.layout].name} · seviye ${settings.level} (${names[settings.level]})` +
+      ` · ${settings.level === 1 ? 'tuşlar' : 'yeni'}: <b>${shown.replace(/</g, '&lt;')}</b>`;
+  }
+
+  /* ---------- Klavye olayları ---------- */
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' || e.key === 'Tab') {
+      e.preventDefault();
+      restart();
+      return;
+    }
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      backspace(e.ctrlKey || e.altKey || e.metaKey);
+      return;
+    }
+    // Ctrl/Cmd kısayollarını (kopyala, yenile vb.) bozma; AltGr (ctrl+alt) ise karakter üretir.
+    if (e.metaKey || (e.ctrlKey && !e.altKey)) return;
+    if (e.key.length !== 1 || e.isComposing) return; // Shift, Dead, F1 vs.
+    e.preventDefault();
+    if (pos < chars.length) typeChar(e.key);
+  });
+
+  /* ---------- Odak durumu ---------- */
+  const setBlur = (b) => textBox.classList.toggle('blurred', b);
+  window.addEventListener('blur', () => setBlur(true));
+  window.addEventListener('focus', () => setBlur(false));
+  $('focusMsg').addEventListener('click', () => { window.focus(); setBlur(false); });
+  setBlur(!document.hasFocus());
+
+  /* ---------- Ayar düğmeleri ---------- */
+  const SOUND_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>ses açık';
+  const SOUND_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/></svg>ses kapalı';
+
+  function syncButtons() {
+    document.querySelectorAll('.group[data-setting]').forEach((g) => {
+      const key = g.dataset.setting;
+      g.querySelectorAll('button').forEach((b) => b.classList.toggle('active', String(settings[key]) === b.dataset.value));
+    });
+    const sb = $('soundBtn');
+    sb.innerHTML = settings.sound ? SOUND_ON : SOUND_OFF;
+    sb.classList.toggle('active', settings.sound);
+    $('kbBtn').classList.toggle('active', settings.keyboard);
+    kbWrap.classList.toggle('hidden', !settings.keyboard);
+  }
+
+  $('settings').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    btn.blur(); // boşluk tuşu düğmeye basmasın
+    const group = btn.closest('.group[data-setting]');
+    if (group) {
+      const key = group.dataset.setting;
+      const val = key === 'level' ? +btn.dataset.value : btn.dataset.value;
+      if (settings[key] === val) return;
+      settings[key] = val;
+      if (key === 'layout') buildKeyboard();
+      if (key === 'metric') renderStats();
+      else restart();
+    } else if (btn.id === 'soundBtn') {
+      settings.sound = !settings.sound;
+      if (settings.sound && ensureAudio()) blip(BASE_FREQ, { vol: 0.3 });
+    } else if (btn.id === 'kbBtn') {
+      settings.keyboard = !settings.keyboard;
+      highlightNext();
+    } else if (btn.id === 'restartBtn') {
+      restart();
+    }
+    saveSettings();
+    syncButtons();
+    requestAnimationFrame(() => updateCaret(true));
+  });
+
+  $('speedStat').addEventListener('click', () => {
+    settings.metric = settings.metric === 'wpm' ? 'dks' : 'wpm';
+    saveSettings();
+    syncButtons();
+    renderStats();
+  });
+
+  window.addEventListener('resize', () => updateCaret(true));
+  setInterval(() => { if (stats.started) renderStats(); }, 250);
+
+  /* ---------- Başlat ---------- */
+  buildKeyboard();
+  syncButtons();
+  restart();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => updateCaret(true));
+})();
+</script>
+</body>
+</html>
