@@ -22,6 +22,8 @@
     --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
     --font-size: clamp(22px, 3.2vw, 34px);
     --line-h: 1.65;
+    --tier-c: #d6d4cb;
+    --heat: 0;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
@@ -99,11 +101,90 @@
   .stat .unit { font-size: 14px; color: var(--sub); margin-left: 2px; }
   .stat.clickable { cursor: pointer; }
   .stat.clickable:hover .label { color: var(--text); }
-  #comboVal { display: inline-block; transition: color .2s; }
-  #comboVal.bump { animation: bump .18s ease-out; }
-  @keyframes bump { 0% { transform: scale(1.18); } 100% { transform: scale(1); } }
-  #comboVal.hot { color: var(--main); }
-  #comboVal.broken { color: var(--err); }
+  /* ---------- Combo / efektler ---------- */
+  .combo-stat { margin-left: auto; text-align: right; }
+  .combo-stat .label { text-transform: uppercase; letter-spacing: 3px; font-size: 11px; }
+  #comboVal {
+    display: inline-block;
+    font-size: 54px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--tier-c);
+    text-shadow: 0 0 calc(var(--heat) * 26px) var(--tier-c);
+    transform-origin: 100% 60%;
+    transition: color .25s, text-shadow .25s;
+  }
+  #comboVal.pop { animation: comboPop .22s cubic-bezier(.2, 1.8, .4, 1); }
+  #comboVal.broken { color: var(--err); text-shadow: 0 0 20px var(--err); animation: comboBreak .4s ease-out; }
+  @keyframes comboPop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
+  @keyframes comboBreak {
+    0% { transform: scale(1.3) rotate(-6deg); }
+    40% { transform: scale(.9) rotate(4deg); }
+    100% { transform: none; }
+  }
+
+  .meter { height: 3px; background: var(--bg2); border-radius: 3px; overflow: hidden; margin-top: -10px; }
+  .meter-fill {
+    height: 100%; width: 0; border-radius: 3px;
+    background: var(--tier-c);
+    box-shadow: 0 0 calc(4px + var(--heat) * 14px) var(--tier-c);
+    transition: width .15s ease-out, background .25s;
+  }
+
+  #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
+  #flash {
+    position: fixed; inset: 0; pointer-events: none; z-index: 49; opacity: 0;
+    box-shadow: inset 0 0 160px 30px var(--flash-c, var(--err));
+  }
+  #flash.go { animation: flash .5s ease-out; }
+  @keyframes flash { 0% { opacity: .55; } 100% { opacity: 0; } }
+
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background: radial-gradient(ellipse 70% 45% at 50% 110%, var(--tier-c), transparent 70%);
+    opacity: calc(var(--heat) * .22);
+    transition: opacity .6s;
+  }
+  .app { position: relative; z-index: 1; }
+
+  .banner {
+    position: absolute; inset: 0; z-index: 0;
+    display: flex; align-items: center; justify-content: center; gap: .3em;
+    pointer-events: none; opacity: 0;
+    color: var(--banner-c, var(--main));
+    font-weight: 700; white-space: nowrap;
+  }
+  .banner .num { font-size: 2.6em; text-shadow: 0 0 40px var(--banner-c); }
+  .banner .lbl { font-size: .9em; letter-spacing: .35em; text-transform: uppercase; }
+  .banner.show { animation: bannerIn .9s cubic-bezier(.15, .9, .3, 1) forwards; }
+  .banner.break { animation: bannerBreak .9s ease-in forwards; }
+  @keyframes bannerIn {
+    0% { opacity: 0; transform: scale(1.8); letter-spacing: .5em; }
+    15% { opacity: .5; transform: scale(1); letter-spacing: 0; }
+    70% { opacity: .35; }
+    100% { opacity: 0; transform: scale(.94); }
+  }
+  @keyframes bannerBreak {
+    0% { opacity: .6; transform: translateY(0) rotate(0); }
+    100% { opacity: 0; transform: translateY(60px) rotate(4deg); }
+  }
+
+  .text-box.shake-s { animation: shakeS .2s linear; }
+  .text-box.shake-l { animation: shakeL .4s linear; }
+  @keyframes shakeS { 25% { transform: translateX(-3px); } 50% { transform: translateX(3px); } 75% { transform: translateX(-2px); } }
+  @keyframes shakeL {
+    10% { transform: translate(-9px, 2px) rotate(-.4deg); } 25% { transform: translate(8px, -2px) rotate(.4deg); }
+    40% { transform: translate(-6px, 1px); } 55% { transform: translate(5px, 0); }
+    70% { transform: translate(-3px, 0); } 85% { transform: translate(2px, 0); }
+  }
+  .text-box.bounce { animation: bounce .3s cubic-bezier(.2, 1.6, .4, 1); }
+  @keyframes bounce { 0% { transform: translateY(6px) scale(.99); } 100% { transform: none; } }
+
+  .fx-on .letter.correct { animation: lpop .2s ease-out; }
+  @keyframes lpop { 0% { transform: translateY(-5px); text-shadow: 0 0 14px var(--tier-c); } 100% { transform: none; } }
+  .fx-on .caret { box-shadow: 0 0 calc(var(--heat) * 16px) var(--tier-c); }
+
+  body.fx-off .meter { display: none; }
 
   /* ---------- Metin ---------- */
   .level-info { font-size: 13px; color: var(--sub); margin-bottom: -10px; min-height: 18px; word-spacing: 2px; }
@@ -118,7 +199,7 @@
     user-select: none;
     cursor: default;
   }
-  .words { position: relative; display: flex; flex-wrap: wrap; align-content: flex-start; }
+  .words { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-content: flex-start; }
   .word { display: flex; height: calc(var(--font-size) * var(--line-h)); }
   .letter { color: var(--sub); position: relative; transition: color .06s; }
   .letter.space { width: .62em; }
@@ -212,6 +293,8 @@
 </style>
 </head>
 <body>
+<canvas id="fx"></canvas>
+<div id="flash"></div>
 <div class="app">
   <header>
     <div class="logo">klavye<span>.</span>d<small>on parmak antrenmanı</small></div>
@@ -232,6 +315,10 @@
       </div>
       <div class="group">
         <button id="soundBtn" title="Sesi aç / kapat"></button>
+        <button id="fxBtn" title="Animasyon efektlerini aç / kapat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg>
+          efekt
+        </button>
         <button id="kbBtn" title="Klavye rehberini aç / kapat">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 15.5h6"/></svg>
           klavye
@@ -253,10 +340,6 @@
       <div class="value"><span id="accVal">–</span><span class="unit">%</span></div>
     </div>
     <div class="stat small">
-      <div class="label">seri</div>
-      <div class="value"><span id="comboVal">0</span></div>
-    </div>
-    <div class="stat small">
       <div class="label">en iyi seri</div>
       <div class="value" id="maxComboVal">0</div>
     </div>
@@ -264,11 +347,17 @@
       <div class="label">süre</div>
       <div class="value" id="timeVal">0:00</div>
     </div>
+    <div class="stat combo-stat">
+      <div class="label">seri</div>
+      <div class="value"><span id="comboVal">0</span></div>
+    </div>
   </div>
+  <div class="meter" title="Sonraki seri eşiğine ilerleme"><div class="meter-fill" id="meterFill"></div></div>
 
   <div class="level-info" id="levelInfo"></div>
 
   <div class="text-box" id="textBox">
+    <div class="banner" id="banner"></div>
     <div class="words" id="words"></div>
     <div class="caret blink" id="caret"></div>
     <div class="focus-msg" id="focusMsg">yazmaya devam etmek için tıkla</div>
@@ -354,7 +443,8 @@
   /* =====================================================================
    *  Ayarlar (localStorage erişilemezse varsayılanlarla çalışır)
    * ===================================================================== */
-  const DEFAULTS = { layout: 'q', level: 1, metric: 'wpm', sound: true, keyboard: true };
+  const reducedMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const DEFAULTS = { layout: 'q', level: 1, metric: 'wpm', sound: true, keyboard: true, fx: !reducedMotion };
   const settings = { ...DEFAULTS };
   try {
     const saved = JSON.parse(localStorage.getItem('klavyed-settings') || '{}');
@@ -444,8 +534,8 @@
     const f = BASE_FREQ * Math.pow(2, step / STEPS_PER_OCTAVE);
     blip(f, { type: 'triangle', dur: 0.1, vol: 0.45 });
     blip(f * 2, { type: 'sine', dur: 0.06, vol: 0.08 }); // hafif parlaklık
-    // Her 50'lik seride küçük bir ödül akoru
-    if (combo > 0 && combo % 50 === 0) {
+    // Seri eşiklerinde (25, 50, 75, 100, 150...) küçük bir ödül akoru
+    if (isMilestone(combo)) {
       [1, 1.25, 1.5, 2].forEach((m, i) => blip(BASE_FREQ * 2 * m, { type: 'sine', dur: 0.22, vol: 0.18, when: 0.05 + i * 0.06 }));
     }
   }
@@ -478,6 +568,155 @@
   const comboVal = $('comboVal'), maxComboVal = $('maxComboVal'), timeVal = $('timeVal');
   const kbWrap = $('kbWrap'), keyboardEl = $('keyboard'), fingerHint = $('fingerHint');
   const levelInfo = $('levelInfo');
+  const banner = $('banner'), meterFill = $('meterFill'), flashEl = $('flash');
+  const rootStyle = document.documentElement.style;
+
+  /* =====================================================================
+   *  Efektler: seri kademeleri, parçacıklar, afişler, sarsıntı
+   * ===================================================================== */
+  const TIERS = [
+    { min: 0, c: '#d6d4cb' },
+    { min: 10, c: '#a6d189' },
+    { min: 25, c: '#e2b714' },
+    { min: 50, c: '#ff8a3d' },
+    { min: 100, c: '#ff4fa3' },
+    { min: 200, c: '#4fd8ff' },
+  ];
+  function tierOf(combo) {
+    let idx = 0;
+    TIERS.forEach((t, i) => { if (combo >= t.min) idx = i; });
+    return { c: TIERS[idx].c, idx };
+  }
+  // Eşikler: 10, 25, 50, 75, 100, sonra her 50'de bir
+  function nextMilestone(c) {
+    for (const m of [10, 25, 50, 75, 100]) if (c < m) return m;
+    return Math.floor(c / 50) * 50 + 50;
+  }
+  function prevMilestone(c) {
+    let p = 0;
+    for (const m of [10, 25, 50, 75, 100]) if (c >= m) p = m;
+    return c >= 100 ? Math.floor(c / 50) * 50 : p;
+  }
+  function isMilestone(c) { return c >= 25 && prevMilestone(c) === c; }
+
+  function applyHeat(combo) {
+    const t = tierOf(combo);
+    const on = settings.fx;
+    rootStyle.setProperty('--tier-c', on ? t.c : '#d6d4cb');
+    rootStyle.setProperty('--heat', on ? t.idx / (TIERS.length - 1) : 0);
+    const prev = prevMilestone(combo), next = nextMilestone(combo);
+    meterFill.style.width = `${((combo - prev) / (next - prev)) * 100}%`;
+  }
+
+  // Basit bir parçacık motoru (tek canvas, toplamsal karışım)
+  const particles = (() => {
+    const cv = $('fx');
+    const ctx = cv.getContext('2d');
+    const list = [];
+    let W = 0, H = 0, running = false, lastT = 0;
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = innerWidth; H = innerHeight;
+      cv.width = W * dpr; cv.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    function tick(t) {
+      const k = lastT ? Math.min((t - lastT) / 16.67, 3) : 1;
+      lastT = t;
+      ctx.clearRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = list.length - 1; i >= 0; i--) {
+        const p = list[i];
+        const drag = Math.pow(p.drag, k);
+        p.vx *= drag;
+        p.vy = p.vy * drag + p.g * k;
+        p.x += p.vx * k;
+        p.y += p.vy * k;
+        p.life -= k;
+        if (p.life <= 0) { list.splice(i, 1); continue; }
+        const a = p.life / p.max;
+        const s = p.size * (0.4 + a * 0.6);
+        ctx.globalAlpha = a;
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+      }
+      ctx.globalAlpha = 1;
+      if (list.length) requestAnimationFrame(tick);
+      else { running = false; lastT = 0; ctx.clearRect(0, 0, W, H); }
+    }
+
+    return function spawn(x, y, n, color, o = {}) {
+      const { speed = 3, angle = -Math.PI / 2, spread = Math.PI * 2, life = 40, size = 3, gravity = 0.1, ring = false, drag = 0.95 } = o;
+      for (let i = 0; i < n; i++) {
+        const a = ring ? (i / n) * Math.PI * 2 : angle + (Math.random() - 0.5) * spread;
+        const sp = ring ? speed * (0.9 + Math.random() * 0.2) : speed * (0.35 + Math.random() * 0.9);
+        const l = life * (0.6 + Math.random() * 0.6);
+        list.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: l, max: l, size: size * (0.6 + Math.random() * 0.8), color, g: gravity, drag });
+      }
+      if (list.length > 700) list.splice(0, list.length - 700);
+      if (!running) { running = true; requestAnimationFrame(tick); }
+    };
+  })();
+
+  function restartAnim(el, cls) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+
+  function boxAnim(cls) {
+    textBox.classList.remove('shake-s', 'shake-l', 'bounce');
+    void textBox.offsetWidth;
+    textBox.classList.add(cls);
+  }
+
+  function showBanner(html, color, cls) {
+    banner.innerHTML = html;
+    banner.style.setProperty('--banner-c', color);
+    banner.classList.remove('show', 'break');
+    void banner.offsetWidth;
+    banner.classList.add(cls);
+  }
+
+  function flash(color) {
+    flashEl.style.setProperty('--flash-c', color);
+    restartAnim(flashEl, 'go');
+  }
+
+  function fxHit(el, combo) {
+    if (!settings.fx) return;
+    const r = el.getBoundingClientRect();
+    const x = r.left + r.width / 2, y = r.top + r.height * 0.55;
+    const t = tierOf(combo);
+    const n = 2 + Math.min(12, Math.floor(combo / 6));
+    particles(x, y, n, t.c, { speed: 1.6 + t.idx * 0.7, spread: Math.PI * 1.1, life: 26 + t.idx * 6, size: 3 + t.idx * 0.4, gravity: 0.09 });
+
+    if (isMilestone(combo)) {
+      const b = textBox.getBoundingClientRect();
+      const cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+      particles(cx, cy, 48, t.c, { ring: true, speed: 9, life: 38, size: 4, gravity: 0, drag: 0.93 });
+      particles(cx, cy, 40, t.c, { speed: 7, life: 55, size: 4, gravity: 0.12 });
+      showBanner(`<span class="num">${combo}</span><span class="lbl">seri</span>`, t.c, 'show');
+      flash(t.c);
+      boxAnim('bounce');
+    }
+  }
+
+  function fxMiss(el, lost) {
+    if (!settings.fx) return;
+    const r = el.getBoundingClientRect();
+    particles(r.left + r.width / 2, r.top + r.height * 0.6, 6, '#e05561', { speed: 2.2, angle: Math.PI / 2, spread: Math.PI, life: 30, gravity: 0.2 });
+    if (lost >= 10) {
+      boxAnim('shake-l');
+      showBanner(`<span class="lbl">${lost} seri kırıldı</span>`, '#e05561', 'break');
+      flash('#e05561');
+    } else {
+      boxAnim('shake-s');
+    }
+  }
 
   /* =====================================================================
    *  Durum
@@ -674,19 +913,19 @@
     }
     accVal.textContent = stats.keystrokes ? Math.floor((stats.hits / stats.keystrokes) * 1000) / 10 : '–';
     comboVal.textContent = stats.combo;
-    comboVal.classList.toggle('hot', stats.combo >= 25);
     maxComboVal.textContent = stats.maxCombo;
     const s = Math.floor(ms / 1000);
     timeVal.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
 
   function bumpCombo(broken) {
-    comboVal.classList.remove('bump', 'broken');
+    if (!settings.fx && !broken) return;
+    comboVal.classList.remove('pop', 'broken');
     void comboVal.offsetWidth;
-    comboVal.classList.add(broken ? 'broken' : 'bump');
+    comboVal.classList.add(broken ? 'broken' : 'pop');
     if (broken) {
       clearTimeout(comboVal._t);
-      comboVal._t = setTimeout(() => comboVal.classList.remove('broken'), 350);
+      comboVal._t = setTimeout(() => comboVal.classList.remove('broken'), 450);
     }
   }
 
@@ -717,8 +956,10 @@
       if (stats.combo > stats.maxCombo) stats.maxCombo = stats.combo;
       playHit(stats.combo);
       bumpCombo(false);
+      fxHit(c.el, stats.combo);
     } else {
       if (stats.combo > 0) bumpCombo(true);
+      fxMiss(c.el, stats.combo);
       stats.combo = 0;
       playError();
       caret.classList.add('error');
@@ -728,6 +969,7 @@
     c.state = ok ? 'correct' : 'incorrect';
     c.el.classList.add(c.state);
     flashKey(c.ch, ok);
+    applyHeat(stats.combo);
     pos++;
     afterMove();
   }
@@ -766,6 +1008,7 @@
     highlightNext();
     renderStats();
     caret.classList.add('blink');
+    applyHeat(0);
     renderLevelInfo();
   }
 
@@ -816,6 +1059,9 @@
     sb.innerHTML = settings.sound ? SOUND_ON : SOUND_OFF;
     sb.classList.toggle('active', settings.sound);
     $('kbBtn').classList.toggle('active', settings.keyboard);
+    $('fxBtn').classList.toggle('active', settings.fx);
+    document.body.classList.toggle('fx-on', settings.fx);
+    document.body.classList.toggle('fx-off', !settings.fx);
     kbWrap.classList.toggle('hidden', !settings.keyboard);
   }
 
@@ -835,6 +1081,9 @@
     } else if (btn.id === 'soundBtn') {
       settings.sound = !settings.sound;
       if (settings.sound && ensureAudio()) blip(BASE_FREQ, { vol: 0.3 });
+    } else if (btn.id === 'fxBtn') {
+      settings.fx = !settings.fx;
+      applyHeat(stats.combo);
     } else if (btn.id === 'kbBtn') {
       settings.keyboard = !settings.keyboard;
       highlightNext();
