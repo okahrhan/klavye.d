@@ -1,0 +1,2 @@
+# klavye.d
+on parmak
