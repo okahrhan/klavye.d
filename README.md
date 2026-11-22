@@ -5,6 +5,7 @@ Tek dosyalık (`index.html`) 10 parmak klavye antrenmanı. Tarayıcıda açman y
 
 - **Düzenler:** Türkçe Q / Türkçe F (işletim sistemindeki klavye düzenin seçtiğinle aynı olmalı)
 - **Seviyeler:** 1 orta satır · 2 + üst satır · 3 tüm harfler · 4 + rakamlar ve noktalama
+- **El seçimi:** iki el / sadece sol el / sadece sağ el (diğer elin tuşları rehberde soluklaşır)
 - **Sonsuz akış:** 3–6 karakterlik anlamsız diziler, süre sınırı yok
 - **Canlı istatistik:** WPM / DKS (tıklayarak değiştir), doğruluk, seri, en iyi seri, aktif süre
 - **Ses:** Web Audio API ile üretilir; doğru seri ilerledikçe perde yükselir, hatada sıfırlanır

@@ -61,14 +61,14 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px 14px;
+    gap: 4px 26px;
     background: var(--bg2);
     border-radius: 10px;
     padding: 6px 12px;
     font-size: 13px;
   }
   .group { display: flex; align-items: center; gap: 2px; }
-  .group + .group { border-left: 2px solid var(--bg); padding-left: 12px; }
+
   .settings button {
     font: inherit;
     background: none;
@@ -274,6 +274,7 @@
   .key .sh { position: absolute; top: 2px; left: 5px; font-size: .68em; opacity: .7; }
   .key.mod { font-size: clamp(8px, 1.2vw, 11px); color: var(--sub2); background: #232528; }
   .key.ghost { visibility: hidden; }
+  .key.dim { opacity: .28; }
   .key.bump::after {
     content: ""; position: absolute; bottom: 5px; width: 26%; height: 2px;
     border-radius: 2px; background: var(--sub);
@@ -288,7 +289,6 @@
     .stats { gap: 20px; }
     .stat .value { font-size: 30px; }
     .stat.small .value { font-size: 22px; }
-    .group + .group { border-left: 0; padding-left: 0; }
   }
 </style>
 </head>
@@ -308,6 +308,11 @@
         <button data-value="2" title="Orta + üst satır">sv 2</button>
         <button data-value="3" title="Tüm harfler">sv 3</button>
         <button data-value="4" title="Tüm harfler + rakam + noktalama">sv 4</button>
+      </div>
+      <div class="group" data-setting="hand">
+        <button data-value="both" title="İki elin harfleri">iki el</button>
+        <button data-value="left" title="Sadece sol elin harfleri">sol el</button>
+        <button data-value="right" title="Sadece sağ elin harfleri">sağ el</button>
       </div>
       <div class="group" data-setting="metric">
         <button data-value="wpm" title="Dakikada kelime (5 vuruş = 1 kelime)">wpm</button>
@@ -430,21 +435,43 @@
     return isLetter(k) ? upperTR(k) : null;
   };
 
-  function levelLetters(layoutKey, level) {
+  // Bir karakterin tuşuna hangi el basar? (shift'li karakterlerde de tuşun kendisine bakılır)
+  const fingerHand = (finger) => (finger <= 3 ? 'left' : 'right');
+  function charHand(layoutKey, ch) {
     const rows = LAYOUTS[layoutKey].rows;
-    const home = rows[2].keys.filter(isLetter);
-    const top = rows[1].keys.filter(isLetter);
-    const bottom = rows[3].keys.filter(isLetter);
-    if (level === 1) return { letters: home, newOnes: home };
-    if (level === 2) return { letters: [...home, ...top], newOnes: top };
-    return { letters: [...home, ...top, ...bottom], newOnes: level === 3 ? bottom : [...DIGITS, ...PUNCT_END, ...PUNCT_MID] };
+    for (let ri = 0; ri < rows.length; ri++) {
+      const row = rows[ri];
+      for (let ki = 0; ki < row.keys.length; ki++) {
+        if (row.keys[ki] === ch || shiftOf(row, ki) === ch) return fingerHand(FINGER_MAP[ri][ki]);
+      }
+    }
+    return null;
+  }
+  const byHand = (layoutKey, hand, list) =>
+    hand === 'both' ? list : list.filter((ch) => charHand(layoutKey, ch) === hand);
+
+  // Seçili seviye + el için kullanılacak karakter havuzları
+  function charPools(layoutKey, level, hand) {
+    const f = (list) => byHand(layoutKey, hand, list);
+    const rows = LAYOUTS[layoutKey].rows;
+    const home = f(rows[2].keys.filter(isLetter));
+    const top = f(rows[1].keys.filter(isLetter));
+    const bottom = f(rows[3].keys.filter(isLetter));
+    const digits = f(DIGITS), punctEnd = f(PUNCT_END), punctMid = f(PUNCT_MID);
+    if (level === 1) return { letters: home, newOnes: home, digits, punctEnd, punctMid };
+    if (level === 2) return { letters: [...home, ...top], newOnes: top, digits, punctEnd, punctMid };
+    return {
+      letters: [...home, ...top, ...bottom],
+      newOnes: level === 3 ? bottom : [...digits, ...punctEnd, ...punctMid],
+      digits, punctEnd, punctMid,
+    };
   }
 
   /* =====================================================================
    *  Ayarlar (localStorage erişilemezse varsayılanlarla çalışır)
    * ===================================================================== */
   const reducedMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const DEFAULTS = { layout: 'q', level: 1, metric: 'wpm', sound: true, keyboard: true, fx: !reducedMotion };
+  const DEFAULTS = { layout: 'q', level: 1, hand: 'both', metric: 'wpm', sound: true, keyboard: true, fx: !reducedMotion };
   const settings = { ...DEFAULTS };
   try {
     const saved = JSON.parse(localStorage.getItem('klavyed-settings') || '{}');
@@ -452,6 +479,7 @@
   } catch (_) { /* yoksay */ }
   if (!LAYOUTS[settings.layout]) settings.layout = 'q';
   settings.level = [1, 2, 3, 4].includes(+settings.level) ? +settings.level : 1;
+  if (!['both', 'left', 'right'].includes(settings.hand)) settings.hand = 'both';
   const saveSettings = () => {
     try { localStorage.setItem('klavyed-settings', JSON.stringify(settings)); } catch (_) { /* yoksay */ }
   };
@@ -475,19 +503,22 @@
   }
 
   function generateWord() {
-    const { letters } = levelLetters(settings.layout, settings.level);
+    const { letters, digits, punctEnd, punctMid } = charPools(settings.layout, settings.level, settings.hand);
     if (settings.level < 4) return randomSeq(letters, randInt(3, 6));
 
+    // Tek elde bazı noktalama işaretleri olmayabilir; boş havuzları atla.
     const r = Math.random();
-    if (r < 0.15) return randomSeq(DIGITS, randInt(2, 4));
+    if (r < 0.15 && digits.length) return randomSeq(digits, randInt(2, 4));
     let w = randomSeq(letters, randInt(3, 5));
     if (r < 0.42) {
-      w += pick(PUNCT_END);
+      if (punctEnd.length) w += pick(punctEnd);
     } else if (r < 0.54) {
-      const k = randInt(1, w.length - 1);
-      w = w.slice(0, k) + pick(PUNCT_MID) + w.slice(k);
+      if (punctMid.length) {
+        const k = randInt(1, w.length - 1);
+        w = w.slice(0, k) + pick(punctMid) + w.slice(k);
+      }
     } else if (r < 0.62) {
-      w += pick(DIGITS);
+      if (digits.length) w += pick(digits);
     }
     return w;
   }
@@ -841,7 +872,9 @@
         const sh = shiftOf(row, ki);
         const showSh = sh && !isLetter(k) ? sh : null;
         const finger = FINGER_MAP[ri][ki];
-        const el = makeKey(k, { sh: showSh, cls: L.bumps.includes(k) ? 'bump' : '' });
+        const offHand = settings.hand !== 'both' && fingerHand(finger) !== settings.hand;
+        const cls = [L.bumps.includes(k) ? 'bump' : '', offHand ? 'dim' : ''].join(' ').trim();
+        const el = makeKey(k, { sh: showSh, cls });
         rowEl.appendChild(el);
         if (!keyIndex.has(k)) keyIndex.set(k, { el, shift: false, finger });
         if (sh && !keyIndex.has(sh)) keyIndex.set(sh, { el, shift: true, finger });
@@ -1013,10 +1046,11 @@
   }
 
   function renderLevelInfo() {
-    const { newOnes } = levelLetters(settings.layout, settings.level);
+    const { newOnes } = charPools(settings.layout, settings.level, settings.hand);
     const names = { 1: 'orta satır', 2: 'orta + üst satır', 3: 'tüm harfler', 4: 'harfler + rakam + noktalama' };
+    const hands = { both: '', left: ' · sol el', right: ' · sağ el' };
     const shown = newOnes.map((c) => (c === ' ' ? '␣' : c)).join(' ');
-    levelInfo.innerHTML = `${LAYOUTS[settings.layout].name} · seviye ${settings.level} (${names[settings.level]})` +
+    levelInfo.innerHTML = `${LAYOUTS[settings.layout].name} · seviye ${settings.level} (${names[settings.level]})${hands[settings.hand]}` +
       ` · ${settings.level === 1 ? 'tuşlar' : 'yeni'}: <b>${shown.replace(/</g, '&lt;')}</b>`;
   }
 
@@ -1075,7 +1109,7 @@
       const val = key === 'level' ? +btn.dataset.value : btn.dataset.value;
       if (settings[key] === val) return;
       settings[key] = val;
-      if (key === 'layout') buildKeyboard();
+      if (key === 'layout' || key === 'hand') buildKeyboard();
       if (key === 'metric') renderStats();
       else restart();
     } else if (btn.id === 'soundBtn') {
